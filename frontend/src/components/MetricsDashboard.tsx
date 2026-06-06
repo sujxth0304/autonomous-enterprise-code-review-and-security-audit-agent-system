@@ -63,12 +63,14 @@ export const MetricsDashboard: React.FC = () => {
   // Transform findings-over-time data for recharts
   const timelineData = React.useMemo(() => {
     if (!overTime) return []
-    const byDate: Record<string, Record<string, number>> = {}
+    const byDate: Record<string, Record<string, string | number>> = {}
     overTime.forEach((point) => {
       if (!byDate[point.date]) byDate[point.date] = { date: point.date }
       byDate[point.date][point.severity] = point.count
     })
-    return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
+    return Object.values(byDate).sort((a, b) =>
+      String(a.date).localeCompare(String(b.date))
+    )
   }, [overTime])
 
   // Pie chart data from severity breakdown
