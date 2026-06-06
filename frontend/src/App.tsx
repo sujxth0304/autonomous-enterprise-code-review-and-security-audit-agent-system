@@ -144,7 +144,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-gray-100">
-          <div className="text-xs text-gray-400">v0.1.0 · Powered by Claude</div>
+          <div className="text-xs text-gray-400">v0.1.0 · Powered by Gemini</div>
         </div>
       </div>
 
