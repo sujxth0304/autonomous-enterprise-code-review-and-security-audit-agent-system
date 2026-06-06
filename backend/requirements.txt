@@ -6,10 +6,8 @@ sqlalchemy==2.0.35
 alembic==1.13.3
 psycopg2-binary==2.9.9
 asyncpg==0.29.0
-anthropic==0.40.0
-openai==1.51.0
 langchain==0.3.7
-langchain-anthropic==0.2.4
+langchain-google-genai==2.0.7
 langchain-openai==0.2.5
 langgraph==0.2.38
 weaviate-client==4.9.0

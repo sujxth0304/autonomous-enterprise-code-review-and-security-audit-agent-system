@@ -3,7 +3,7 @@
 from typing import Any, Dict, List, Optional
 
 import structlog
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI  # reused with xAI's OpenAI-compatible endpoint
 from pydantic import BaseModel
 
 from app.config import settings
@@ -27,7 +27,7 @@ async def score_finding_quality(
     Use GPT-4o as a judge to score a finding's quality and likelihood of being a false positive.
     Falls back to heuristic scoring if OpenAI is unavailable.
     """
-    if not settings.OPENAI_API_KEY or not llm:
+    if not settings.GROK_API_KEY or not llm:
         return _heuristic_quality_score(finding)
 
     prompt = f"""You are a senior security engineer reviewing an automated code analysis finding.
@@ -129,12 +129,13 @@ async def run_reflection_agent(
     - Returns filtered, quality-reviewed findings
     """
     llm = None
-    if settings.OPENAI_API_KEY:
+    if settings.GROK_API_KEY:
         try:
             llm = ChatOpenAI(
-                model="gpt-4o",
+                model=settings.GROK_MODEL,
                 temperature=0,
-                openai_api_key=settings.OPENAI_API_KEY,
+                openai_api_key=settings.GROK_API_KEY,
+                openai_api_base=settings.GROK_BASE_URL,
             )
         except Exception:
             pass

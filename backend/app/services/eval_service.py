@@ -17,13 +17,14 @@ class EvalService:
 
     def _get_llm(self):
         """Lazy initialize GPT-4o judge."""
-        if self._llm is None and settings.OPENAI_API_KEY:
+        if self._llm is None and settings.GROK_API_KEY:
             try:
                 from langchain_openai import ChatOpenAI
                 self._llm = ChatOpenAI(
-                    model="gpt-4o",
+                    model=settings.GROK_MODEL,
                     temperature=0,
-                    openai_api_key=settings.OPENAI_API_KEY,
+                    openai_api_key=settings.GROK_API_KEY,
+                    openai_api_base=settings.GROK_BASE_URL,
                 )
             except Exception as exc:
                 logger.warning("eval_service.llm_init_failed", error=str(exc))

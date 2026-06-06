@@ -44,8 +44,11 @@ class Settings(BaseSettings):
     WEAVIATE_API_KEY: Optional[str] = None
 
     # ─── AI / LLM ─────────────────────────────────────────────────────────────
-    ANTHROPIC_API_KEY: str = Field(default="", description="Anthropic API key")
-    OPENAI_API_KEY: str = Field(default="", description="OpenAI API key")
+    GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key (free tier: aistudio.google.com)")
+    GEMINI_MODEL: str = Field(default="gemini-2.0-flash", description="Gemini model for orchestration and agents")
+    GROK_API_KEY: str = Field(default="", description="xAI Grok API key (free tier: console.x.ai)")
+    GROK_MODEL: str = Field(default="grok-3-mini", description="Grok model for reflection/judge tasks")
+    GROK_BASE_URL: str = Field(default="https://api.x.ai/v1", description="xAI OpenAI-compatible endpoint")
 
     # ─── GitHub Integration ───────────────────────────────────────────────────
     GITHUB_WEBHOOK_SECRET: str = "dev-webhook-secret"

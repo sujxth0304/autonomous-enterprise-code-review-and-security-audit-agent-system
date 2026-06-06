@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 
 import structlog
 from langchain.tools import StructuredTool
-from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from app.config import settings

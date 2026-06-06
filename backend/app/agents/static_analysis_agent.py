@@ -8,7 +8,7 @@ import structlog
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.prompts import PromptTemplate
 from langchain.tools import StructuredTool
-from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from app.config import settings
@@ -277,15 +277,15 @@ async def run_static_analysis_agent(
 ) -> List[Dict[str, Any]]:
     """Run the static analysis agent and return structured findings."""
 
-    if not settings.ANTHROPIC_API_KEY:
+    if not settings.GEMINI_API_KEY:
         logger.warning("static_analysis.no_api_key_using_heuristics")
         return _heuristic_static_analysis(pr_data, diff_content)
 
     try:
-        llm = ChatAnthropic(
-            model="claude-sonnet-4-6",
+        llm = ChatGoogleGenerativeAI(
+            model=settings.GEMINI_MODEL,
             temperature=0,
-            anthropic_api_key=settings.ANTHROPIC_API_KEY,
+            google_api_key=settings.GEMINI_API_KEY,
         )
 
         agent = create_react_agent(llm, STATIC_ANALYSIS_TOOLS, STATIC_ANALYSIS_PROMPT)
