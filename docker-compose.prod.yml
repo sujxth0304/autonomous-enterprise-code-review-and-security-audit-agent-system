@@ -1,0 +1,119 @@
+version: "3.9"
+
+x-backend-env: &backend-env
+  DATABASE_URL: ${DATABASE_URL}
+  REDIS_URL: ${REDIS_URL}
+  CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+  CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+  KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+  WEAVIATE_URL: ${WEAVIATE_URL}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  OPENAI_API_KEY: ${OPENAI_API_KEY}
+  GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
+  GITHUB_APP_ID: ${GITHUB_APP_ID}
+  GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+  LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
+  LANGSMITH_PROJECT: ${LANGSMITH_PROJECT}
+
+services:
+  backend:
+    image: ${REGISTRY}/code-review-backend:${IMAGE_TAG:-latest}
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *backend-env
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  celery_worker:
+    image: ${REGISTRY}/code-review-backend:${IMAGE_TAG:-latest}
+    restart: always
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=8 -Q pr_review,default
+    environment:
+      <<: *backend-env
+    deploy:
+      replicas: 4
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
+        reservations:
+          cpus: "1"
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  celery_beat:
+    image: ${REGISTRY}/code-review-backend:${IMAGE_TAG:-latest}
+    restart: always
+    command: celery -A app.workers.celery_app beat --loglevel=info
+    environment:
+      <<: *backend-env
+    deploy:
+      replicas: 1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  kafka_consumer:
+    image: ${REGISTRY}/code-review-backend:${IMAGE_TAG:-latest}
+    restart: always
+    command: python -m app.kafka.consumer
+    environment:
+      <<: *backend-env
+    deploy:
+      replicas: 2
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  frontend:
+    image: ${REGISTRY}/code-review-frontend:${IMAGE_TAG:-latest}
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+      - frontend
