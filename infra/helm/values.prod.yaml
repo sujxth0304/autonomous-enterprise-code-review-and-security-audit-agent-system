@@ -1,0 +1,33 @@
+# Production overrides
+global:
+  image:
+    pullPolicy: Always
+
+backend:
+  replicaCount: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 20
+
+celeryWorker:
+  replicaCount: 6
+  autoscaling:
+    minReplicas: 4
+    maxReplicas: 50
+
+postgresql:
+  enabled: false
+  external:
+    host: "10.0.0.10"  # CloudSQL private IP
+    port: 5432
+
+redis:
+  enabled: false
+  external:
+    host: "10.0.0.20"  # Memorystore private IP
+    port: 6379
+
+monitoring:
+  prometheus:
+    retention: 30d
+    storage: 100Gi

@@ -1,0 +1,15 @@
+apiVersion: v2
+name: code-review-agent
+description: Autonomous Enterprise Code Review and Security Audit Agent System
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - code-review
+  - security
+  - llm
+  - agents
+  - langgraph
+maintainers:
+  - name: Engineering Team
+    email: eng@example.com

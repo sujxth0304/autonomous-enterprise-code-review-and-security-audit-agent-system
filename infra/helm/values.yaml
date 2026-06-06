@@ -1,0 +1,72 @@
+global:
+  image:
+    registry: gcr.io
+    repository: PROJECT_ID/code-review-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+backend:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+celeryWorker:
+  replicaCount: 4
+  concurrency: 2
+  queues: "pr_review,default"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+
+ingress:
+  enabled: true
+  className: nginx
+  host: code-review.example.com
+  tls: true
+
+postgresql:
+  enabled: false  # Use CloudSQL in production
+  external:
+    host: ""
+    port: 5432
+    database: codereview
+    username: codereview
+
+redis:
+  enabled: false  # Use Memorystore in production
+  external:
+    host: ""
+    port: 6379
+
+kafka:
+  enabled: true
+  replicaCount: 3
+
+weaviate:
+  enabled: true
+  memory: 8Gi
+  storage: 100Gi
+
+monitoring:
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true

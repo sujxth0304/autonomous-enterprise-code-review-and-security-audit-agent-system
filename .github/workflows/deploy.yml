@@ -1,0 +1,133 @@
+name: Deploy to GKE
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: production
+        type: choice
+        options: [staging, production]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: code-review-production
+  GKE_REGION: us-central1
+  REGISTRY: gcr.io
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker gcr.io
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - id: meta
+        name: Extract metadata
+        run: echo "version=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/code-review-backend:${{ steps.meta.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/code-review-backend:latest
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/code-review-backend:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/code-review-backend:buildcache,mode=max
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/code-review-frontend:${{ steps.meta.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/code-review-frontend:latest
+          build-args: |
+            VITE_API_URL=https://code-review.example.com
+
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_REGION }}
+
+      - name: Run DB migrations
+        run: |
+          kubectl run alembic-migrate \
+            --image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/code-review-backend:${{ needs.build-and-push.outputs.image-tag }} \
+            --restart=Never \
+            --namespace=code-review \
+            --env="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --command -- alembic upgrade head
+          kubectl wait --for=condition=complete job/alembic-migrate \
+            --timeout=120s --namespace=code-review || true
+          kubectl delete pod alembic-migrate --namespace=code-review --ignore-not-found
+
+      - name: Deploy via Helm
+        run: |
+          helm upgrade --install code-review infra/helm \
+            --namespace code-review \
+            --create-namespace \
+            -f infra/helm/values.yaml \
+            -f infra/helm/values.prod.yaml \
+            --set global.image.tag=${{ needs.build-and-push.outputs.image-tag }} \
+            --set global.image.registry=${{ env.REGISTRY }} \
+            --set global.image.repository=${{ env.PROJECT_ID }}/code-review-backend \
+            --timeout 10m \
+            --wait \
+            --atomic
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/backend -n code-review --timeout=300s
+          kubectl rollout status deployment/celery-worker -n code-review --timeout=300s
+
+      - name: Post-deploy smoke test
+        run: |
+          BACKEND_URL=$(kubectl get ingress code-review-ingress -n code-review -o jsonpath='{.spec.rules[0].host}')
+          sleep 30
+          curl -sf "https://${BACKEND_URL}/health" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert data['status'] in ('healthy', 'degraded'), f'Health check failed: {data}'
+          print('Health check passed:', data['status'])
+          "
